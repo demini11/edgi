@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>NETDRIVE</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --void:#0A0A0F;--surface:#0F0F1A;--panel:#141428;--card:#1A1A30;
+  --border:#1E1E40;--red:#FF003C;--cyan:#00F5FF;--yellow:#FFE600;
+  --purple:#9B00FF;--green:#00FF88;--text:#E8E8FF;--muted:#7070AA;--dim:#3A3A6A;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;overflow:hidden;background:var(--void);color:var(--text);font-family:'Rajdhani',sans-serif;touch-action:manipulation}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,245,255,.012) 2px,rgba(0,245,255,.012) 4px);pointer-events:none;z-index:9000}
+
+/* ===== LAYOUT ===== */
+#app{display:flex;flex-direction:column;height:100vh;padding-top:var(--safe-top)}
+
+/* Status bar area */
+#statusBar{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;position:relative}
+.status-logo{font-family:'Orbitron',monospace;font-size:15px;font-weight:900;color:var(--cyan);letter-spacing:3px;text-shadow:0 0 15px rgba(0,245,255,.5)}
+.status-title{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1px;flex:1;text-align:center}
+.status-icons{display:flex;gap:10px;align-items:center}
+.status-icon{font-size:16px;color:var(--muted);cursor:pointer;transition:.2s;padding:4px}
+.status-icon:active{color:var(--cyan)}
+.storage-mini{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim)}
+
+/* Search bar */
+#searchBar{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 12px;display:none;flex-shrink:0}
+#searchBar.show{display:block}
+#searchBar input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:12px;border-radius:2px;outline:none}
+#searchBar input:focus{border-color:var(--cyan)}
+#searchBar input::placeholder{color:var(--dim)}
+
+/* Main scroll area */
+#scrollArea{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+#content{padding:12px;padding-bottom:calc(80px + var(--safe-bottom))}
+
+/* Filter chips */
+.chip-bar{display:flex;gap:6px;overflow-x:auto;padding:0 0 8px;margin-bottom:8px;scrollbar-width:none}
+.chip-bar::-webkit-scrollbar{display:none}
+.chip{padding:5px 12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:1px;cursor:pointer;border-radius:20px;white-space:nowrap;transition:.2s;flex-shrink:0}
+.chip:active{transform:scale(.95)}
+.chip.active{color:var(--void);background:var(--cyan);border-color:var(--cyan)}
+
+/* Sort row */
+.sort-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.sort-label{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);white-space:nowrap}
+.sort-select{background:var(--card);border:1px solid var(--border);color:var(--muted);padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:10px;border-radius:2px;outline:none;flex:1}
+.count-label{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);margin-left:auto;white-space:nowrap}
+
+/* Date divider */
+.date-divider{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;padding:10px 0 6px;display:flex;align-items:center;gap:8px}
+.date-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Photo grid */
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+.photo-item{position:relative;aspect-ratio:1;overflow:hidden;cursor:pointer;background:var(--card);border-radius:1px}
+.photo-item.selected::after{content:'✓';position:absolute;top:4px;right:4px;width:20px;height:20px;background:var(--cyan);color:var(--void);display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:11px;font-weight:900;z-index:2}
+.photo-item.selected::before{content:'';position:absolute;inset:0;border:2px solid var(--cyan);z-index:1;pointer-events:none}
+.photo-thumb{width:100%;height:100%;object-fit:cover;display:block}
+.photo-icon{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;background:var(--panel);flex-direction:column;gap:4px}
+.photo-icon-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);text-transform:uppercase}
+.photo-fav{position:absolute;bottom:4px;right:4px;font-size:13px;color:var(--yellow);display:none}
+.photo-fav.show{display:block}
+.vid-badge{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.7);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:8px;padding:1px 5px;border-radius:1px}
+
+/* List view */
+.list-view{display:none;flex-direction:column;gap:2px}
+.list-view.show{display:flex}
+.list-item{display:flex;align-items:center;gap:10px;padding:10px;background:var(--card);border-radius:2px;cursor:pointer;border:1px solid var(--border);transition:.1s}
+.list-item:active{background:rgba(0,245,255,.05);border-color:var(--cyan)}
+.list-item.selected{border-color:var(--cyan);background:rgba(0,245,255,.05)}
+.list-thumb{width:44px;height:44px;object-fit:cover;border-radius:2px;flex-shrink:0;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:22px}
+.list-info{flex:1;min-width:0}
+.list-name{font-size:13px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-meta{font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-top:2px}
+.list-fav{font-size:16px;color:var(--yellow);flex-shrink:0}
+
+/* Albums */
+.album-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.album-card{background:var(--card);border:1px solid var(--border);border-radius:4px;overflow:hidden;cursor:pointer;transition:.1s}
+.album-card:active{border-color:var(--cyan);transform:scale(.98)}
+.album-cover{height:110px;overflow:hidden;background:var(--panel);display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.album-cover img{width:100%;height:100%;object-fit:cover}
+.album-cover .no-img{display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--dim);grid-column:1/-1;grid-row:1/-1}
+.album-tag{background:rgba(0,0,0,.8);border:1px solid var(--cyan);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:8px;padding:2px 5px}
+.album-info{padding:8px 10px}
+.album-name{font-size:13px;font-weight:700;color:var(--text);letter-spacing:.5px}
+.album-count{font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace}
+.new-album-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:30px 10px;border-style:dashed;color:var(--dim);font-size:12px;font-weight:600;letter-spacing:1px}
+.new-album-card:active{color:var(--cyan);border-color:var(--cyan)}
+.new-album-card .plus{font-size:28px}
+
+/* Empty state */
+.empty-state{text-align:center;padding:60px 20px}
+.empty-icon{font-size:44px;color:var(--dim);margin-bottom:12px}
+.empty-title{font-size:16px;font-weight:700;color:var(--muted);letter-spacing:2px;margin-bottom:6px}
+.empty-sub{font-size:11px;color:var(--dim);font-family:'Share Tech Mono',monospace}
+
+/* ===== BOTTOM NAV ===== */
+#bottomNav{position:fixed;bottom:0;left:0;right:0;height:calc(60px + var(--safe-bottom));background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:flex-start;padding-top:8px;z-index:100;padding-bottom:var(--safe-bottom)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0;transition:.1s;color:var(--dim)}
+.nav-item:active{color:var(--cyan)}
+.nav-item.active{color:var(--cyan)}
+.nav-item.active .nav-icon{text-shadow:0 0 10px var(--cyan)}
+.nav-icon{font-size:22px;transition:.2s}
+.nav-label{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:1px}
+.nav-upload-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:0}
+.nav-upload-inner{width:46px;height:46px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;margin-top:-18px;box-shadow:0 0 20px rgba(255,0,60,.5);transition:.2s}
+.nav-upload-inner:active{transform:scale(.9)}
+.nav-badge{position:absolute;top:-2px;right:-4px;background:var(--red);color:#fff;font-size:8px;min-width:14px;height:14px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace}
+
+/* ===== FAB Upload area ===== */
+#uploadSheet{position:fixed;inset:0;z-index:500;display:none}
+#uploadSheet.show{display:flex;flex-direction:column;justify-content:flex-end}
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.8)}
+.sheet-panel{position:relative;background:var(--panel);border-top:1px solid var(--border);border-radius:12px 12px 0 0;padding:16px 16px calc(16px + var(--safe-bottom));z-index:1}
+.sheet-handle{width:36px;height:3px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.sheet-title{font-family:'Orbitron',monospace;font-size:13px;color:var(--cyan);letter-spacing:2px;margin-bottom:14px}
+.sheet-opts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.sheet-opt{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;background:var(--card);border:1px solid var(--border);border-radius:4px;cursor:pointer;transition:.1s}
+.sheet-opt:active{border-color:var(--cyan);background:rgba(0,245,255,.05)}
+.sheet-opt-icon{font-size:26px}
+.sheet-opt-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);text-align:center;letter-spacing:.5px}
+.upload-progress-list{margin-top:12px;display:flex;flex-direction:column;gap:6px;max-height:120px;overflow-y:auto}
+.up-item{background:var(--card);border:1px solid var(--border);border-radius:2px;padding:8px 10px}
+.up-name{font-size:11px;font-family:'Share Tech Mono',monospace;color:var(--text);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up-bar{height:2px;background:var(--dim);border-radius:1px;overflow:hidden}
+.up-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .2s}
+
+/* ===== LIGHTBOX ===== */
+#lightbox{position:fixed;inset:0;background:#000;z-index:800;display:none;flex-direction:column}
+#lightbox.show{display:flex}
+.lb-top{height:calc(52px + var(--safe-top));padding-top:var(--safe-top);background:rgba(10,10,15,.95);border-bottom:1px solid var(--border);display:flex;align-items:center;padding-left:12px;padding-right:12px;gap:10px;flex-shrink:0}
+.lb-back{font-size:22px;color:var(--muted);cursor:pointer;padding:4px;transition:.2s}
+.lb-back:active{color:var(--cyan)}
+.lb-filename{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-top-acts{display:flex;gap:8px}
+.lb-top-btn{font-size:20px;color:var(--muted);cursor:pointer;padding:4px;transition:.2s}
+.lb-top-btn:active{color:var(--cyan)}
+.lb-top-btn.fav-on{color:var(--yellow)}
+.lb-top-btn.del:active{color:var(--red)}
+.lb-media{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+#lbImg{max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom}
+#lbFile{display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-size:60px}
+.lb-file-name{font-size:13px;font-family:'Share Tech Mono',monospace;color:var(--muted);text-align:center;padding:0 20px}
+.lb-bottom{background:rgba(10,10,15,.95);border-top:1px solid var(--border);padding:10px 16px calc(10px + var(--safe-bottom));flex-shrink:0}
+.lb-meta{display:flex;gap:16px;margin-bottom:10px}
+.lb-meta-item{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted)}
+.lb-meta-item span{color:var(--text)}
+.lb-acts{display:flex;gap:8px}
+.lb-act{flex:1;padding:9px 4px;background:var(--card);border:1px solid var(--border);color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;border-radius:2px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:.1s}
+.lb-act:active{border-color:var(--cyan);color:var(--cyan)}
+.lb-act.danger:active{border-color:var(--red);color:var(--red)}
+/* Swipe nav */
+.lb-counter{text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:6px}
+
+/* ===== SELECTION BAR ===== */
+#selBar{position:fixed;top:0;left:0;right:0;background:var(--panel);border-bottom:2px solid var(--cyan);padding:calc(8px + var(--safe-top)) 12px 8px;z-index:200;display:none;align-items:center;gap:10px;box-shadow:0 2px 16px rgba(0,245,255,.2)}
+#selBar.show{display:flex}
+.sel-count{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--cyan);flex:1}
+.sel-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 10px;border-radius:2px;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.5px;white-space:nowrap}
+.sel-btn:active{color:var(--cyan);border-color:var(--cyan)}
+.sel-btn.danger:active{color:var(--red);border-color:var(--red)}
+
+/* ===== MODALS ===== */
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:900;display:none;align-items:flex-end;justify-content:center}
+.modal-wrap.show{display:flex}
+.modal-box{background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:20px 16px calc(20px + var(--safe-bottom));width:100%}
+.modal-title{font-family:'Orbitron',monospace;font-size:13px;color:var(--cyan);letter-spacing:2px;margin-bottom:14px}
+.modal-input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);padding:12px;font-family:'Share Tech Mono',monospace;font-size:13px;border-radius:2px;outline:none;margin-bottom:12px}
+.modal-input:focus{border-color:var(--cyan)}
+.modal-btns{display:flex;gap:8px}
+.modal-btn{flex:1;padding:11px;border-radius:2px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;border:none;transition:.1s}
+.modal-btn:active{transform:scale(.97)}
+.modal-btn.cancel{background:var(--card);color:var(--muted)}
+.modal-btn.confirm{background:var(--red);color:#fff}
+
+/* ===== CONTEXT MENU ===== */
+#ctxMenu{position:fixed;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:4px 0;z-index:600;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,.9);display:none}
+#ctxMenu.show{display:block}
+.ctx-item{padding:12px 14px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--muted);letter-spacing:.5px}
+.ctx-item:active{color:var(--cyan);background:rgba(0,245,255,.05)}
+.ctx-item.danger:active{color:var(--red)}
+.ctx-sep{height:1px;background:var(--border);margin:2px 0}
+
+/* ===== NOTIFICATIONS ===== */
+#notif{position:fixed;top:calc(60px + var(--safe-top));left:12px;right:12px;z-index:2000;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.notif-item{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--cyan);padding:10px 14px;border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);animation:slideDown .3s ease}
+.notif-item.success{border-left-color:var(--green)}
+.notif-item.error{border-left-color:var(--red)}
+@keyframes slideDown{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:2px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:1px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Status Bar -->
+  <div id="statusBar">
+    <div class="status-logo">ND</div>
+    <div class="status-title" id="pageTitle">SEMUA FOTO</div>
+    <div class="status-icons">
+      <div class="status-icon" onclick="toggleSearch()" title="Cari">⌕</div>
+      <div class="status-icon" onclick="toggleView()" id="viewIcon" title="Ubah tampilan">⊞</div>
+      <div class="status-icon" onclick="showMore()" title="Lainnya">⋮</div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div id="searchBar">
+    <input type="search" id="searchInput" placeholder="Cari nama file..." oninput="renderCurrent()" autocomplete="off">
+  </div>
+
+  <!-- Scroll Area -->
+  <div id="scrollArea">
+    <div id="content">
+      <!-- Chip filter -->
+      <div class="chip-bar" id="chipBar">
+        <div class="chip active" onclick="filterBy('all',this)">SEMUA</div>
+        <div class="chip" onclick="filterBy('image',this)">FOTO</div>
+        <div class="chip" onclick="filterBy('video',this)">VIDEO</div>
+        <div class="chip" onclick="filterBy('doc',this)">DOKUMEN</div>
+        <div class="chip" onclick="filterBy('other',this)">LAINNYA</div>
+      </div>
+      <div class="sort-row">
+        <span class="sort-label">URUTKAN:</span>
+        <select class="sort-select" onchange="currentSort=this.value;renderCurrent()">
+          <option value="date-desc">TERBARU</option>
+          <option value="date-asc">TERLAMA</option>
+          <option value="name-asc">NAMA A-Z</option>
+          <option value="name-desc">NAMA Z-A</option>
+          <option value="size-desc">UKURAN ↓</option>
+          <option value="size-asc">UKURAN ↑</option>
+        </select>
+        <span class="count-label" id="fileCount">0 file</span>
+      </div>
+
+      <!-- Grid view -->
+      <div id="gridView"></div>
+      <!-- List view -->
+      <div class="list-view" id="listView"></div>
+      <!-- Albums view -->
+      <div id="albumsView" style="display:none"></div>
+      <!-- Empty -->
+      <div class="empty-state" id="emptyState" style="display:none">
+        <div class="empty-icon">◻</div>
+        <div class="empty-title">TIDAK ADA FILE</div>
+        <div class="empty-sub">Tap ＋ untuk upload file baru</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div id="bottomNav">
+    <div class="nav-item active" id="nav-photos" onclick="showPage('photos')">
+      <span class="nav-icon">⊞</span>
+      <span class="nav-label">FOTO</span>
+    </div>
+    <div class="nav-item" id="nav-albums" onclick="showPage('albums')">
+      <span class="nav-icon">◫</span>
+      <span class="nav-label">ALBUM</span>
+    </div>
+    <div class="nav-upload-btn" onclick="openUploadSheet()">
+      <div class="nav-upload-inner">＋</div>
+      <span class="nav-label" style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:1px;margin-top:2px">UPLOAD</span>
+    </div>
+    <div class="nav-item" id="nav-favorites" onclick="showPage('favorites')">
+      <span class="nav-icon">◈</span>
+      <span class="nav-label">FAVORIT</span>
+    </div>
+    <div class="nav-item" id="nav-storage" onclick="showStorage()">
+      <span class="nav-icon">⊟</span>
+      <span class="nav-label">STORAGE</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== UPLOAD SHEET ===== -->
+<div id="uploadSheet">
+  <div class="sheet-bg" onclick="closeUploadSheet()"></div>
+  <div class="sheet-panel">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">UPLOAD FILE</div>
+    <div class="sheet-opts">
+      <div class="sheet-opt" onclick="triggerFile('image/*')">
+        <div class="sheet-opt-icon">📷</div>
+        <div class="sheet-opt-label">KAMERA / GALERI</div>
+      </div>
+      <div class="sheet-opt" onclick="triggerFile('video/*')">
+        <div class="sheet-opt-icon">🎬</div>
+        <div class="sheet-opt-label">VIDEO</div>
+      </div>
+      <div class="sheet-opt" onclick="triggerFile('*/*')">
+        <div class="sheet-opt-icon">📁</div>
+        <div class="sheet-opt-label">SEMUA FILE</div>
+      </div>
+    </div>
+    <div class="upload-progress-list" id="uploadProgressList"></div>
+  </div>
+</div>
+<input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)">
+
+<!-- ===== LIGHTBOX ===== -->
+<div id="lightbox">
+  <div class="lb-top">
+    <div class="lb-back" onclick="closeLightbox()">←</div>
+    <div class="lb-filename" id="lbName">-</div>
+    <div class="lb-top-acts">
+      <div class="lb-top-btn" id="lbFavBtn" onclick="toggleFavLb()">◈</div>
+      <div class="lb-top-btn del" onclick="deleteLb()">⊘</div>
+    </div>
+  </div>
+  <div class="lb-media" id="lbMedia">
+    <img id="lbImg" src="" alt="" style="display:none">
+    <div id="lbFile" style="display:none"><div id="lbFileIcon"></div><div class="lb-file-name" id="lbFileName2"></div></div>
+  </div>
+  <div class="lb-bottom">
+    <div class="lb-counter" id="lbCounter"></div>
+    <div class="lb-meta">
+      <div class="lb-meta-item">UKURAN: <span id="lbSize">-</span></div>
+      <div class="lb-meta-item">TANGGAL: <span id="lbDate">-</span></div>
+      <div class="lb-meta-item">TIPE: <span id="lbType">-</span></div>
+    </div>
+    <div class="lb-acts">
+      <div class="lb-act" onclick="downloadLb()">↓ UNDUH</div>
+      <div class="lb-act" onclick="renameLb()">✎ NAMA</div>
+      <div class="lb-act danger" onclick="deleteLb()">⊘ HAPUS</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SELECTION BAR ===== -->
+<div id="selBar">
+  <div class="sel-count" id="selCount">0 dipilih</div>
+  <button class="sel-btn" onclick="toggleFavSelected()">◈ FAV</button>
+  <button class="sel-btn" onclick="downloadSelected()">↓ UNDUH</button>
+  <button class="sel-btn danger" onclick="deleteSelected()">⊘ HAPUS</button>
+  <button class="sel-btn" onclick="clearSelection()">✕</button>
+</div>
+
+<!-- ===== CONTEXT MENU ===== -->
+<div id="ctxMenu">
+  <div class="ctx-item" onclick="ctxDo('open')">◻ Buka</div>
+  <div class="ctx-item" onclick="ctxDo('fav')">◈ Favorit</div>
+  <div class="ctx-item" onclick="ctxDo('download')">↓ Unduh</div>
+  <div class="ctx-item" onclick="ctxDo('rename')">✎ Ganti Nama</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" onclick="ctxDo('delete')">⊘ Hapus</div>
+</div>
+
+<!-- ===== MODALS ===== -->
+<div class="modal-wrap" id="renameModal">
+  <div class="modal-box">
+    <div class="modal-title">GANTI NAMA</div>
+    <input class="modal-input" type="text" id="renameInput" placeholder="Nama baru..." onkeydown="if(event.key==='Enter')doRename()">
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="hideModal('renameModal')">BATAL</button>
+      <button class="modal-btn confirm" onclick="doRename()">SIMPAN</button>
+    </div>
+  </div>
+</div>
+<div class="modal-wrap" id="albumModal">
+  <div class="modal-box">
+    <div class="modal-title">BUAT ALBUM BARU</div>
+    <input class="modal-input" type="text" id="albumInput" placeholder="Nama album..." onkeydown="if(event.key==='Enter')doCreateAlbum()">
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="hideModal('albumModal')">BATAL</button>
+      <button class="modal-btn confirm" onclick="doCreateAlbum()">BUAT</button>
+    </div>
+  </div>
+</div>
+<div class="modal-wrap" id="storageModal">
+  <div class="modal-box">
+    <div class="modal-title">INFO STORAGE</div>
+    <div id="storageInfo" style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--muted);line-height:2;margin-bottom:14px"></div>
+    <button class="modal-btn confirm" onclick="hideModal('storageModal')">TUTUP</button>
+  </div>
+</div>
+
+<!-- ===== NOTIF ===== -->
+<div id="notif"></div>
+
+<script>
+// ========== STATE ==========
+let files=[];
+let selected=[];
+let currentView='grid';
+let currentPage='photos';
+let currentFilter='all';
+let currentSort='date-desc';
+let lbIndex=0;
+let ctxTarget=null;
+let albums=[{id:1,name:'Favorit Saya',files:[]},{id:2,name:'Perjalanan',files:[]},{id:3,name:'Kenangan',files:[]}];
+let totalSize=0;
+const MAX_STORAGE=15*1024*1024*1024;
+let longPressTimer=null;
+let touchStartX=0;let touchStartY=0;
+
+// ========== UTILS ==========
+const typeMap={jpg:'image',jpeg:'image',png:'image',gif:'image',webp:'image',svg:'image',bmp:'image',avif:'image',heic:'image',mp4:'video',webm:'video',mov:'video',avi:'video',mkv:'video',pdf:'doc',doc:'doc',docx:'doc',xls:'doc',xlsx:'doc',ppt:'doc',pptx:'doc',txt:'doc',csv:'doc'};
+function getType(name){return typeMap[(name.split('.').pop()||'').toLowerCase()]||'other';}
+function getIcon(type,name){
+  const e=(name.split('.').pop()||'').toLowerCase();
+  if(type==='image')return'🖼';if(type==='video')return'🎬';
+  if(e==='pdf')return'📋';if(['xls','xlsx','csv'].includes(e))return'📊';
+  if(['ppt','pptx'].includes(e))return'📊';if(type==='doc')return'📄';
+  if(['mp3','wav','flac','aac'].includes(e))return'🎵';
+  if(['zip','rar','7z'].includes(e))return'🗜';
+  return'📦';
+}
+function fmtSize(b){if(!b)return'0 B';const k=1024,s=['B','KB','MB','GB'];const i=Math.floor(Math.log(b)/Math.log(k));return(b/Math.pow(k,i)).toFixed(1)+' '+s[i];}
+function fmtDate(ts){return new Date(ts).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});}
+function showNotif(msg,type='info'){
+  const n=document.createElement('div');n.className='notif-item '+type;
+  n.textContent=msg;document.getElementById('notif').appendChild(n);
+  setTimeout(()=>n.remove(),3000);
+}
+
+// ========== FILE HANDLING ==========
+function triggerFile(accept){document.getElementById('fileInput').accept=accept;document.getElementById('fileInput').click();}
+function handleFiles(fl){
+  Array.from(fl).forEach(f=>processFile(f));
+  document.getElementById('fileInput').value='';
+}
+function processFile(file){
+  const id='f_'+Date.now()+'_'+Math.random().toString(36).substr(2,5);
+  const el=document.createElement('div');el.className='up-item';
+  el.innerHTML=`<div class="up-name">${file.name}</div><div class="up-bar"><div class="up-fill" id="fill_${id}" style="width:0%"></div></div>`;
+  document.getElementById('uploadProgressList').appendChild(el);
+  let p=0;
+  const iv=setInterval(()=>{
+    p+=Math.random()*25;if(p>=100){p=100;clearInterval(iv);
+      setTimeout(()=>{el.remove();finishFile(file,id);},300);}
+    document.getElementById('fill_'+id).style.width=p+'%';
+  },80);
+}
+function finishFile(file,id){
+  const type=getType(file.name);
+  const obj={id,name:file.name,size:file.size,type,date:Date.now(),fav:false,url:null,file};
+  if(type==='image'){
+    const r=new FileReader();
+    r.onload=e=>{obj.url=e.target.result;push(obj);};
+    r.readAsDataURL(file);
+  }else push(obj);
+}
+function push(obj){
+  files.unshift(obj);totalSize+=obj.size;updateStorage();renderCurrent();
+  showNotif(obj.name+' berhasil diupload','success');
+}
+
+// ========== STORAGE ==========
+function updateStorage(){
+  const pct=Math.min(totalSize/MAX_STORAGE*100,100);
+  const usedMB=totalSize/(1024*1024);
+  document.getElementById('storageInfo') && (document.getElementById('storageInfo').innerHTML=
+    `TERPAKAI: ${fmtSize(totalSize)}<br>SISA: ${fmtSize(MAX_STORAGE-totalSize)}<br>TOTAL: 15 GB<br>PERSEN: ${pct.toFixed(1)}%<br>JUMLAH FILE: ${files.length}`);
+}
+function showStorage(){
+  updateStorage();
+  document.getElementById('storageModal').classList.add('show');
+}
+
+// ========== RENDER ==========
+function getFiltered(){
+  let f=files.slice();
+  if(currentPage==='favorites')f=f.filter(x=>x.fav);
+  else if(currentFilter!=='all')f=f.filter(x=>x.type===currentFilter);
+  const q=(document.getElementById('searchInput').value||'').toLowerCase();
+  if(q)f=f.filter(x=>x.name.toLowerCase().includes(q));
+  f.sort((a,b)=>{
+    if(currentSort==='date-desc')return b.date-a.date;
+    if(currentSort==='date-asc')return a.date-b.date;
+    if(currentSort==='name-asc')return a.name.localeCompare(b.name);
+    if(currentSort==='name-desc')return b.name.localeCompare(a.name);
+    if(currentSort==='size-desc')return b.size-a.size;
+    return a.size-b.size;
+  });
+  return f;
+}
+
+function renderCurrent(){
+  if(currentPage==='albums'){renderAlbums();return;}
+  const f=getFiltered();
+  document.getElementById('fileCount').textContent=f.length+' file';
+  document.getElementById('emptyState').style.display=f.length?'none':'block';
+  if(currentView==='grid')renderGrid(f);else renderList(f);
+}
+
+function renderGrid(f){
+  document.getElementById('gridView').style.display='';
+  document.getElementById('listView').classList.remove('show');
+  if(!f.length){document.getElementById('gridView').innerHTML='';return;}
+  let html='',lastDate='';
+  f.forEach((file,i)=>{
+    const fd=fmtDate(file.date);
+    if(fd!==lastDate){html+=`<div class="date-divider" style="grid-column:1/-1">${fd}</div>`;lastDate=fd;}
+    const isSel=selected.includes(file.id);
+    const thumb=file.type==='image'&&file.url
+      ?`<img class="photo-thumb" src="${file.url}" alt="" loading="lazy">`
+      :`<div class="photo-icon">${getIcon(file.type,file.name)}<span class="photo-icon-label">${(file.name.split('.').pop()||'').toUpperCase()}</span></div>`;
+    html+=`<div class="photo-item${isSel?' selected':''}" data-id="${file.id}" data-idx="${i}"
+      onclick="handleTap('${file.id}',${i},event)"
+      oncontextmenu="showCtx(event,'${file.id}')">
+      ${thumb}
+      <span class="photo-fav${file.fav?' show':''}">◈</span>
+      ${file.type==='video'?'<span class="vid-badge">▶ VID</span>':''}
+    </div>`;
+  });
+  document.getElementById('gridView').innerHTML=html;
+  // Long press for mobile
+  document.getElementById('gridView').querySelectorAll('.photo-item').forEach(el=>{
+    el.addEventListener('touchstart',e=>{
+      const id=el.dataset.id;
+      longPressTimer=setTimeout(()=>{toggleSelect(id);},600);
+    },{passive:true});
+    el.addEventListener('touchend',()=>clearTimeout(longPressTimer),{passive:true});
+    el.addEventListener('touchmove',()=>clearTimeout(longPressTimer),{passive:true});
+  });
+}
+
+function renderList(f){
+  document.getElementById('gridView').style.display='none';
+  const lv=document.getElementById('listView');
+  lv.classList.add('show');
+  if(!f.length){lv.innerHTML='';return;}
+  lv.innerHTML=f.map((file,i)=>{
+    const isSel=selected.includes(file.id);
+    const thumb=file.type==='image'&&file.url
+      ?`<img class="list-thumb" src="${file.url}" alt="">`
+      :`<div class="list-thumb">${getIcon(file.type,file.name)}</div>`;
+    return`<div class="list-item${isSel?' selected':''}" onclick="handleTap('${file.id}',${i},event)" oncontextmenu="showCtx(event,'${file.id}')">
+      ${thumb}
+      <div class="list-info">
+        <div class="list-name">${file.name}</div>
+        <div class="list-meta">${file.type.toUpperCase()} • ${fmtSize(file.size)} • ${fmtDate(file.date)}</div>
+      </div>
+      ${file.fav?'<div class="list-fav">◈</div>':''}
+    </div>`;
+  }).join('');
+}
+
+function renderAlbums(){
+  document.getElementById('gridView').style.display='none';
+  document.getElementById('listView').classList.remove('show');
+  document.getElementById('emptyState').style.display='none';
+  const av=document.getElementById('albumsView');av.style.display='block';
+  let html='<div class="album-grid">';
+  albums.forEach(a=>{
+    const af=files.filter(f=>a.files.includes(f.id));
+    const imgs=af.filter(f=>f.type==='image'&&f.url).slice(0,4);
+    let cover='';
+    if(imgs.length>=4)cover=imgs.map(f=>`<img src="${f.url}" alt="">`).join('');
+    else if(imgs.length>0)cover=`<img src="${imgs[0].url}" alt="" style="grid-column:1/-1;grid-row:1/-1">`;
+    else cover=`<div class="no-img">◫</div>`;
+    html+=`<div class="album-card" onclick="showNotif('Album: ${a.name}')">
+      <div class="album-cover">${cover}</div>
+      <div class="album-info">
+        <div class="album-name">${a.name}</div>
+        <div class="album-count">${af.length} file</div>
+      </div>
+    </div>`;
+  });
+  html+=`<div class="album-card new-album-card" onclick="showModal('albumModal')">
+    <div class="plus">＋</div><div>ALBUM BARU</div>
+  </div></div>`;
+  av.innerHTML=html;
+}
+
+// ========== NAVIGATION ==========
+function showPage(page){
+  currentPage=page;
+  ['photos','albums','favorites','storage'].forEach(p=>{
+    const el=document.getElementById('nav-'+p);
+    if(el)el.classList.toggle('active',p===page);
+  });
+  const titles={photos:'SEMUA FOTO',albums:'ALBUM',favorites:'FAVORIT',storage:'STORAGE'};
+  document.getElementById('pageTitle').textContent=titles[page]||page.toUpperCase();
+  document.getElementById('chipBar').style.display=page==='albums'?'none':'flex';
+  document.querySelector('.sort-row').style.display=page==='albums'?'none':'flex';
+  document.getElementById('albumsView').style.display=page==='albums'?'block':'none';
+  if(page!=='albums'){document.getElementById('albumsView').style.display='none';}
+  clearSelection();renderCurrent();
+  document.getElementById('scrollArea').scrollTop=0;
+}
+
+function filterBy(f,el){
+  currentFilter=f;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  renderCurrent();
+}
+
+function toggleView(){
+  currentView=currentView==='grid'?'list':'grid';
+  document.getElementById('viewIcon').textContent=currentView==='grid'?'⊞':'≡';
+  renderCurrent();
+}
+
+function toggleSearch(){
+  const sb=document.getElementById('searchBar');
+  sb.classList.toggle('show');
+  if(sb.classList.contains('show'))document.getElementById('searchInput').focus();
+  else{document.getElementById('searchInput').value='';renderCurrent();}
+}
+
+// ========== TAP / SELECT ==========
+function handleTap(id,idx,e){
+  if(e)e.preventDefault();
+  if(selected.length>0){toggleSelect(id);}
+  else{openLightbox(idx);}
+}
+
+function toggleSelect(id){
+  const i=selected.indexOf(id);
+  if(i===-1)selected.push(id);else selected.splice(i,1);
+  updateSelBar();renderCurrent();
+}
+
+function updateSelBar(){
+  const bar=document.getElementById('selBar');
+  bar.classList.toggle('show',selected.length>0);
+  document.getElementById('selCount').textContent=selected.length+' file dipilih';
+}
+
+function clearSelection(){selected=[];updateSelBar();renderCurrent();}
+
+function toggleFavSelected(){
+  selected.forEach(id=>{const f=files.find(x=>x.id===id);if(f)f.fav=!f.fav;});
+  showNotif(selected.length+' file diperbarui');clearSelection();
+}
+function downloadSelected(){selected.forEach(id=>dlFile(id));clearSelection();}
+function deleteSelected(){
+  const c=selected.length;
+  selected.forEach(id=>{const f=files.find(x=>x.id===id);if(f)totalSize-=f.size;});
+  files=files.filter(x=>!selected.includes(x.id));
+  selected=[];updateSelBar();updateStorage();renderCurrent();
+  showNotif(c+' file dihapus','error');
+}
+
+// ========== LIGHTBOX ==========
+function openLightbox(idx){
+  const f=getFiltered();if(!f.length)return;
+  lbIndex=idx;showLbFile(f[lbIndex]);
+  document.getElementById('lightbox').classList.add('show');
+  // Swipe
+  const m=document.getElementById('lbMedia');
+  m.addEventListener('touchstart',lbTouchStart,{passive:true});
+  m.addEventListener('touchend',lbTouchEnd,{passive:true});
+}
+
+function showLbFile(file){
+  document.getElementById('lbName').textContent=file.name;
+  document.getElementById('lbSize').textContent=fmtSize(file.size);
+  document.getElementById('lbDate').textContent=fmtDate(file.date);
+  document.getElementById('lbType').textContent=file.type.toUpperCase();
+  const f=getFiltered();
+  document.getElementById('lbCounter').textContent=(lbIndex+1)+' / '+f.length;
+  document.getElementById('lbFavBtn').classList.toggle('fav-on',file.fav);
+  const img=document.getElementById('lbImg');
+  const fk=document.getElementById('lbFile');
+  if(file.type==='image'&&file.url){img.src=file.url;img.style.display='block';fk.style.display='none';}
+  else{img.style.display='none';fk.style.display='flex';document.getElementById('lbFileIcon').textContent=getIcon(file.type,file.name);document.getElementById('lbFileName2').textContent=file.name;}
+}
+
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('show');
+  const m=document.getElementById('lbMedia');
+  m.removeEventListener('touchstart',lbTouchStart);
+  m.removeEventListener('touchend',lbTouchEnd);
+}
+
+function lbTouchStart(e){touchStartX=e.touches[0].clientX;touchStartY=e.touches[0].clientY;}
+function lbTouchEnd(e){
+  const dx=e.changedTouches[0].clientX-touchStartX;
+  const dy=e.changedTouches[0].clientY-touchStartY;
+  if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>40){
+    const f=getFiltered();lbIndex=(lbIndex+(dx<0?1:-1)+f.length)%f.length;showLbFile(f[lbIndex]);
+  }
+}
+
+function toggleFavLb(){
+  const f=getFiltered()[lbIndex];if(!f)return;
+  f.fav=!f.fav;document.getElementById('lbFavBtn').classList.toggle('fav-on',f.fav);
+  showNotif(f.fav?'Ditambah ke favorit':'Dihapus dari favorit');renderCurrent();
+}
+
+function deleteLb(){
+  const f=getFiltered()[lbIndex];if(!f)return;
+  totalSize-=f.size;files=files.filter(x=>x.id!==f.id);
+  updateStorage();closeLightbox();renderCurrent();showNotif(f.name+' dihapus','error');
+}
+
+function renameLb(){
+  const f=getFiltered()[lbIndex];if(!f)return;
+  ctxTarget=f.id;
+  document.getElementById('renameInput').value=f.name;
+  showModal('renameModal');
+}
+
+function downloadLb(){dlFile(getFiltered()[lbIndex]?.id);}
+
+function dlFile(id){
+  const f=files.find(x=>x.id===id);if(!f)return;
+  if(f.url){const a=document.createElement('a');a.href=f.url;a.download=f.name;a.click();}
+  else if(f.file){const u=URL.createObjectURL(f.file);const a=document.createElement('a');a.href=u;a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+  showNotif('Mengunduh '+f.name);
+}
+
+// ========== CONTEXT MENU ==========
+function showCtx(e,id){
+  e.preventDefault();ctxTarget=id;
+  const m=document.getElementById('ctxMenu');
+  const x=Math.min(e.clientX||e.touches?.[0]?.clientX||0,window.innerWidth-170);
+  const y=Math.min(e.clientY||e.touches?.[0]?.clientY||0,window.innerHeight-200);
+  m.style.left=x+'px';m.style.top=y+'px';m.classList.add('show');
+}
+document.addEventListener('click',()=>document.getElementById('ctxMenu').classList.remove('show'));
+
+function ctxDo(act){
+  const f=files.find(x=>x.id===ctxTarget);if(!f)return;
+  if(act==='open'){const i=getFiltered().findIndex(x=>x.id===ctxTarget);openLightbox(i);}
+  else if(act==='fav'){f.fav=!f.fav;showNotif(f.fav?'Ditambah ke favorit':'Dihapus dari favorit');renderCurrent();}
+  else if(act==='download')dlFile(ctxTarget);
+  else if(act==='rename'){document.getElementById('renameInput').value=f.name;showModal('renameModal');}
+  else if(act==='delete'){totalSize-=f.size;files=files.filter(x=>x.id!==ctxTarget);updateStorage();renderCurrent();showNotif(f.name+' dihapus','error');}
+  document.getElementById('ctxMenu').classList.remove('show');
+}
+
+// ========== MODALS ==========
+function showModal(id){document.getElementById(id).classList.add('show');setTimeout(()=>{const inp=document.querySelector('#'+id+' input');if(inp)inp.focus();},100);}
+function hideModal(id){document.getElementById(id).classList.remove('show');}
+
+function doRename(){
+  const f=files.find(x=>x.id===ctxTarget);
+  const n=document.getElementById('renameInput').value.trim();
+  if(f&&n){f.name=n;renderCurrent();showNotif('Nama diubah: '+n);}
+  hideModal('renameModal');
+}
+
+function doCreateAlbum(){
+  const n=document.getElementById('albumInput').value.trim();
+  if(n){albums.push({id:Date.now(),name:n,files:[]});showNotif('Album "'+n+'" dibuat','success');hideModal('albumModal');if(currentPage==='albums')renderAlbums();}
+}
+
+// ========== UPLOAD SHEET ==========
+function openUploadSheet(){document.getElementById('uploadSheet').classList.add('show');}
+function closeUploadSheet(){
+  if(document.getElementById('uploadProgressList').children.length===0)
+    document.getElementById('uploadSheet').classList.remove('show');
+}
+
+// ========== MORE MENU ==========
+function showMore(){showNotif('NETDRIVE v2.0 // Cyberpunk Edgerunners');}
+
+// ========== INIT with demo data ==========
+(function init(){
+  const demo=[
+    {name:'cyberpunk_city.jpg',size:2.4*1024*1024,type:'image',url:'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&q=70',fav:true,date:Date.now()-0},
+    {name:'neon_lights.jpg',size:1.8*1024*1024,type:'image',url:'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&q=70',fav:true,date:Date.now()-86400000},
+    {name:'future_city.jpg',size:3.1*1024*1024,type:'image',url:'https://images.unsplash.com/photo-1523821741446-edb2b68bb7a0?w=400&q=70',fav:false,date:Date.now()-172800000},
+    {name:'dark_terminal.jpg',size:1.2*1024*1024,type:'image',url:'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&q=70',fav:false,date:Date.now()-259200000},
+    {name:'matrix_code.jpg',size:2.0*1024*1024,type:'image',url:'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400&q=70',fav:false,date:Date.now()-345600000},
+    {name:'neon_rain.jpg',size:1.5*1024*1024,type:'image',url:'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=70',fav:false,date:Date.now()-432000000},
+    {name:'project_report.pdf',size:540*1024,type:'doc',fav:false,date:Date.now()-518400000},
+    {name:'soundtrack.mp3',size:8.5*1024*1024,type:'other',fav:false,date:Date.now()-604800000},
+    {name:'mission_data.csv',size:120*1024,type:'doc',fav:false,date:Date.now()-691200000},
+    {name:'edgerunner_clip.mp4',size:45*1024*1024,type:'video',fav:false,date:Date.now()-777600000},
+    {name:'assets_pack.zip',size:12*1024*1024,type:'other',fav:false,date:Date.now()-864000000},
+  ];
+  demo.forEach((d,i)=>{
+    files.push({...d,id:'demo_'+i,file:null});
+    totalSize+=d.size;
+  });
+  updateStorage();renderCurrent();
+})();
+</script>
+</body>
+</html>
